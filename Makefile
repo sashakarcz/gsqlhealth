@@ -7,6 +7,15 @@ GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 GOFMT=$(GOCMD) fmt
 
+# Go cache directories (fix for Ubuntu permission issues)
+GOCACHE=$(shell $(GOCMD) env GOCACHE)
+GOMODCACHE=$(shell $(GOCMD) env GOMODCACHE)
+
+# Environment variables to avoid /tmp permission issues
+export GOCACHE := $(PWD)/.cache/go-build
+export GOMODCACHE := $(PWD)/.cache/go-mod
+export GOTMPDIR := $(PWD)/.cache/tmp
+
 # Binary info
 BINARY_NAME=gsqlhealth
 BINARY_DIR=bin
@@ -21,32 +30,42 @@ all: clean deps test build
 
 # Build the binary
 .PHONY: build
-build:
+build: setup-cache
 	mkdir -p $(BINARY_DIR)
+	chmod 755 $(BINARY_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	chmod 755 $(BINARY_DIR)/$(BINARY_NAME)
 
 # Build for multiple platforms
 .PHONY: build-all
-build-all: clean deps
+build-all: clean deps setup-cache
 	mkdir -p $(BINARY_DIR)
+	chmod 755 $(BINARY_DIR)
 	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
 	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
 	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
+	chmod 755 $(BINARY_DIR)/*
+
+# Setup cache directories
+.PHONY: setup-cache
+setup-cache:
+	@mkdir -p .cache/go-build .cache/go-mod .cache/tmp
+	@chmod 755 .cache .cache/go-build .cache/go-mod .cache/tmp
 
 # Run tests
 .PHONY: test
-test:
+test: setup-cache
 	$(GOTEST) -v ./...
 
 # Run tests with coverage
 .PHONY: test-coverage
-test-coverage:
+test-coverage: setup-cache
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 
 # Run tests with race detection
 .PHONY: test-race
-test-race:
+test-race: setup-cache
 	$(GOTEST) -v -race ./...
 
 # Format code
@@ -69,7 +88,7 @@ deps:
 .PHONY: clean
 clean:
 	$(GOCLEAN)
-	rm -rf $(BINARY_DIR)
+	rm -rf $(BINARY_DIR) .cache
 	rm -f coverage.out coverage.html
 
 # Run the application
@@ -130,7 +149,7 @@ help:
 	@echo "  fmt            - Format code"
 	@echo "  lint           - Lint code"
 	@echo "  deps           - Install dependencies"
-	@echo "  clean          - Clean build artifacts"
+	@echo "  clean          - Clean build artifacts and cache"
 	@echo "  run            - Build and run the application"
 	@echo "  validate-config- Validate configuration file"
 	@echo "  dev            - Run with live reload"
@@ -140,4 +159,5 @@ help:
 	@echo "  security       - Run security scan"
 	@echo "  update-deps    - Update dependencies"
 	@echo "  docs           - Generate documentation"
+	@echo "  setup-cache    - Setup local cache directories (fixes Ubuntu permissions)"
 	@echo "  help           - Show this help message"

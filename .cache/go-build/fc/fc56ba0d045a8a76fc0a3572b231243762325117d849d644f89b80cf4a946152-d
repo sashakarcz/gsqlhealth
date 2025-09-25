@@ -1,0 +1,5 @@
+covervars.go
+interface.cover.go
+mssql.cover.go
+mysql.cover.go
+postgres.cover.go

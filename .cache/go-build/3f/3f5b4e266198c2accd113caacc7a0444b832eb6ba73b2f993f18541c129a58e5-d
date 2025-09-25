@@ -1,0 +1,43 @@
+=== RUN   TestIsConnectionError
+=== RUN   TestIsConnectionError/nil_error
+=== RUN   TestIsConnectionError/connection_refused
+=== RUN   TestIsConnectionError/connection_timeout
+=== RUN   TestIsConnectionError/connection_reset
+=== RUN   TestIsConnectionError/driver_bad_connection
+=== RUN   TestIsConnectionError/network_unreachable
+=== RUN   TestIsConnectionError/server_not_available
+=== RUN   TestIsConnectionError/SQL_syntax_error_-_not_a_connection_error
+=== RUN   TestIsConnectionError/table_not_found_-_not_a_connection_error
+=== RUN   TestIsConnectionError/permission_denied_-_not_a_connection_error
+--- PASS: TestIsConnectionError (0.00s)
+    --- PASS: TestIsConnectionError/nil_error (0.00s)
+    --- PASS: TestIsConnectionError/connection_refused (0.00s)
+    --- PASS: TestIsConnectionError/connection_timeout (0.00s)
+    --- PASS: TestIsConnectionError/connection_reset (0.00s)
+    --- PASS: TestIsConnectionError/driver_bad_connection (0.00s)
+    --- PASS: TestIsConnectionError/network_unreachable (0.00s)
+    --- PASS: TestIsConnectionError/server_not_available (0.00s)
+    --- PASS: TestIsConnectionError/SQL_syntax_error_-_not_a_connection_error (0.00s)
+    --- PASS: TestIsConnectionError/table_not_found_-_not_a_connection_error (0.00s)
+    --- PASS: TestIsConnectionError/permission_denied_-_not_a_connection_error (0.00s)
+=== RUN   TestHealthErrorTypes
+=== RUN   TestHealthErrorTypes/connection_error
+=== RUN   TestHealthErrorTypes/not_found_error
+=== RUN   TestHealthErrorTypes/query_error
+=== RUN   TestHealthErrorTypes/timeout_error
+--- PASS: TestHealthErrorTypes (0.00s)
+    --- PASS: TestHealthErrorTypes/connection_error (0.00s)
+    --- PASS: TestHealthErrorTypes/not_found_error (0.00s)
+    --- PASS: TestHealthErrorTypes/query_error (0.00s)
+    --- PASS: TestHealthErrorTypes/timeout_error (0.00s)
+=== RUN   TestHealthErrorMessages
+=== RUN   TestHealthErrorMessages/with_table
+=== RUN   TestHealthErrorMessages/without_table
+--- PASS: TestHealthErrorMessages (0.00s)
+    --- PASS: TestHealthErrorMessages/with_table (0.00s)
+    --- PASS: TestHealthErrorMessages/without_table (0.00s)
+=== RUN   TestCreateService
+--- PASS: TestCreateService (0.00s)
+PASS
+coverage: 10.6% of statements
+ok  	gsqlhealth/internal/health	0.006s	coverage: 10.6% of statements

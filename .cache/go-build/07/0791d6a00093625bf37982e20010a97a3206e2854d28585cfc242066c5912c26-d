@@ -1,0 +1,217 @@
+//line /home/sasha/gsqlhealth/internal/database/mysql.go:1:1
+package database
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+// MySQLDriver implements the Driver interface for MySQL databases
+type MySQLDriver struct {
+	db *sql.DB
+}
+
+// NewMySQLDriver creates a new MySQL driver instance
+func NewMySQLDriver() *MySQLDriver {goCover_d9c7f9aa98b6__15[0] = 1 ; goCover_d9c7f9aa98b6__15[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__15[2] = 15 ; goCover_d9c7f9aa98b6__15[3] = 1;
+	return &MySQLDriver{}
+}
+
+// Connect establishes a connection to the MySQL database
+func (d *MySQLDriver) Connect(ctx context.Context, info ConnectionInfo) error {goCover_d9c7f9aa98b6__16[0] = 5 ; goCover_d9c7f9aa98b6__16[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__16[2] = 16 ; goCover_d9c7f9aa98b6__16[3] = 1;
+	dsn := d.buildDSN(info)
+
+	var err error
+	d.db, err = sql.Open("mysql", dsn)
+	if err != nil {goCover_d9c7f9aa98b6__16[6] = 1;
+		return fmt.Errorf("failed to open MySQL connection: %w", err)
+	}
+
+	// Configure connection pool settings
+	goCover_d9c7f9aa98b6__16[4] = 1;d.db.SetMaxOpenConns(25)
+	d.db.SetMaxIdleConns(5)
+	d.db.SetConnMaxLifetime(5 * time.Minute)
+	d.db.SetConnMaxIdleTime(1 * time.Minute)
+
+	// Test the connection
+	ctx, cancel := context.WithTimeout(ctx, info.Timeout)
+	defer cancel()
+
+	if err := d.db.PingContext(ctx); err != nil {goCover_d9c7f9aa98b6__16[7] = 1;
+		d.db.Close()
+		return fmt.Errorf("failed to ping MySQL database: %w", err)
+	}
+
+	goCover_d9c7f9aa98b6__16[5] = 1;return nil
+}
+
+// Close closes the MySQL database connection
+func (d *MySQLDriver) Close() error {goCover_d9c7f9aa98b6__17[0] = 3 ; goCover_d9c7f9aa98b6__17[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__17[2] = 17 ; goCover_d9c7f9aa98b6__17[3] = 1;
+	if d.db != nil {goCover_d9c7f9aa98b6__17[5] = 1;
+		return d.db.Close()
+	}
+	goCover_d9c7f9aa98b6__17[4] = 1;return nil
+}
+
+// ExecuteHealthCheck executes a health check query and returns the results
+func (d *MySQLDriver) ExecuteHealthCheck(ctx context.Context, query string) (map[string]interface{}, error) {goCover_d9c7f9aa98b6__18[0] = 5 ; goCover_d9c7f9aa98b6__18[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__18[2] = 18 ; goCover_d9c7f9aa98b6__18[3] = 1;
+	if d.db == nil {goCover_d9c7f9aa98b6__18[6] = 1;
+		return nil, fmt.Errorf("database connection is not established")
+	}
+
+	goCover_d9c7f9aa98b6__18[4] = 1;rows, err := d.db.QueryContext(ctx, query)
+	if err != nil {goCover_d9c7f9aa98b6__18[7] = 1;
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	goCover_d9c7f9aa98b6__18[5] = 1;defer rows.Close()
+
+	return d.processRows(rows)
+}
+
+// Ping tests the database connection
+func (d *MySQLDriver) Ping(ctx context.Context) error {goCover_d9c7f9aa98b6__19[0] = 3 ; goCover_d9c7f9aa98b6__19[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__19[2] = 19 ; goCover_d9c7f9aa98b6__19[3] = 1;
+	if d.db == nil {goCover_d9c7f9aa98b6__19[5] = 1;
+		return fmt.Errorf("database connection is not established")
+	}
+	goCover_d9c7f9aa98b6__19[4] = 1;return d.db.PingContext(ctx)
+}
+
+// GetDriverName returns the name of the database driver
+func (d *MySQLDriver) GetDriverName() string {goCover_d9c7f9aa98b6__20[0] = 1 ; goCover_d9c7f9aa98b6__20[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__20[2] = 20 ; goCover_d9c7f9aa98b6__20[3] = 1;
+	return "mysql"
+}
+
+// buildDSN constructs the MySQL data source name
+func (d *MySQLDriver) buildDSN(info ConnectionInfo) string {goCover_d9c7f9aa98b6__21[0] = 10 ; goCover_d9c7f9aa98b6__21[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__21[2] = 21 ; goCover_d9c7f9aa98b6__21[3] = 1;
+	var params []string
+
+	// Always set charset to utf8mb4 for better Unicode support
+	params = append(params, "charset=utf8mb4")
+
+	// Set parse time to true for better time handling
+	params = append(params, "parseTime=true")
+
+	// Set location to UTC
+	params = append(params, "loc=UTC")
+
+	// Set connection timeout
+	if info.Timeout > 0 {goCover_d9c7f9aa98b6__21[6] = 1;
+		timeoutSeconds := int(info.Timeout.Seconds())
+		params = append(params, fmt.Sprintf("timeout=%ds", timeoutSeconds))
+		params = append(params, fmt.Sprintf("readTimeout=%ds", timeoutSeconds))
+		params = append(params, fmt.Sprintf("writeTimeout=%ds", timeoutSeconds))
+	}
+
+	// Enable multi-statements for compatibility
+	goCover_d9c7f9aa98b6__21[4] = 1;params = append(params, "multiStatements=true")
+
+	// Handle SSL/TLS configuration
+	if info.SSLMode != "" {goCover_d9c7f9aa98b6__21[7] = 1;
+		switch strings.ToLower(info.SSLMode) {
+		case "disable", "false":goCover_d9c7f9aa98b6__21[8] = 1;
+			params = append(params, "tls=false")
+		case "require", "true":goCover_d9c7f9aa98b6__21[9] = 1;
+			params = append(params, "tls=skip-verify")
+		case "verify-ca":goCover_d9c7f9aa98b6__21[10] = 1;
+			params = append(params, "tls=preferred")
+		case "verify-full":goCover_d9c7f9aa98b6__21[11] = 1;
+			params = append(params, "tls=true")
+		default:goCover_d9c7f9aa98b6__21[12] = 1;
+			params = append(params, "tls=preferred")
+		}
+	}
+
+	goCover_d9c7f9aa98b6__21[5] = 1;paramStr := strings.Join(params, "&")
+
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
+		info.Username,
+		info.Password,
+		info.Host,
+		info.Port,
+		info.Database,
+		paramStr)
+}
+
+// processRows processes SQL query results and returns them as a map
+func (d *MySQLDriver) processRows(rows *sql.Rows) (map[string]interface{}, error) {goCover_d9c7f9aa98b6__22[0] = 20 ; goCover_d9c7f9aa98b6__22[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__22[2] = 22 ; goCover_d9c7f9aa98b6__22[3] = 1;
+	columns, err := rows.Columns()
+	if err != nil {goCover_d9c7f9aa98b6__22[9] = 1;
+		return nil, fmt.Errorf("failed to get column names: %w", err)
+	}
+
+	goCover_d9c7f9aa98b6__22[4] = 1;columnTypes, err := rows.ColumnTypes()
+	if err != nil {goCover_d9c7f9aa98b6__22[10] = 1;
+		return nil, fmt.Errorf("failed to get column types: %w", err)
+	}
+
+	goCover_d9c7f9aa98b6__22[5] = 1;result := make(map[string]interface{})
+
+	// If we have multiple rows, collect them in an array
+	var allResults []map[string]interface{}
+
+	for rows.Next() {goCover_d9c7f9aa98b6__22[11] = 1;
+		// Create a slice of interface{} to hold the values
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+
+		// Create pointers to the values
+		for i := range values {goCover_d9c7f9aa98b6__22[15] = 1;
+			valuePtrs[i] = &values[i]
+		}
+
+		// Scan the values
+		goCover_d9c7f9aa98b6__22[12] = 1;if err := rows.Scan(valuePtrs...); err != nil {goCover_d9c7f9aa98b6__22[16] = 1;
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Convert values to appropriate types
+		goCover_d9c7f9aa98b6__22[13] = 1;rowResult := make(map[string]interface{})
+		for i, col := range columns {goCover_d9c7f9aa98b6__22[17] = 1;
+			rowResult[col] = d.convertValue(values[i], columnTypes[i])
+		}
+
+		goCover_d9c7f9aa98b6__22[14] = 1;allResults = append(allResults, rowResult)
+	}
+
+	goCover_d9c7f9aa98b6__22[6] = 1;if err := rows.Err(); err != nil {goCover_d9c7f9aa98b6__22[18] = 1;
+		return nil, fmt.Errorf("error iterating over rows: %w", err)
+	}
+
+	// If we only have one row, return it directly
+	// Otherwise, return all results
+	goCover_d9c7f9aa98b6__22[7] = 1;if len(allResults) == 1 {goCover_d9c7f9aa98b6__22[19] = 1;
+		result = allResults[0]
+	} else{ goCover_d9c7f9aa98b6__22[20] = 1;if len(allResults) > 1 {goCover_d9c7f9aa98b6__22[21] = 1;
+		result["results"] = allResults
+		result["row_count"] = len(allResults)
+	} else{ goCover_d9c7f9aa98b6__22[22] = 1;{
+		result["row_count"] = 0
+	}}}
+
+	goCover_d9c7f9aa98b6__22[8] = 1;return result, nil
+}
+
+// convertValue converts a database value to an appropriate Go type
+func (d *MySQLDriver) convertValue(value interface{}, colType *sql.ColumnType) interface{} {goCover_d9c7f9aa98b6__23[0] = 7 ; goCover_d9c7f9aa98b6__23[1] = goCover_d9c7f9aa98b6_P ; goCover_d9c7f9aa98b6__23[2] = 23 ; goCover_d9c7f9aa98b6__23[3] = 1;
+	if value == nil {goCover_d9c7f9aa98b6__23[7] = 1;
+		return nil
+	}
+
+	// Handle byte arrays (common for TEXT fields)
+	goCover_d9c7f9aa98b6__23[4] = 1;if byteVal, ok := value.([]byte); ok {goCover_d9c7f9aa98b6__23[8] = 1;
+		// Try to convert to string if it's valid UTF-8
+		str := string(byteVal)
+		return str
+	}
+
+	// Handle time values
+	goCover_d9c7f9aa98b6__23[5] = 1;if timeVal, ok := value.(time.Time); ok {goCover_d9c7f9aa98b6__23[9] = 1;
+		return timeVal.Format(time.RFC3339)
+	}
+
+	goCover_d9c7f9aa98b6__23[6] = 1;return value
+}
