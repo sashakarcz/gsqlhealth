@@ -1,0 +1,63 @@
+databases:
+  - name: "primary-mysql"
+    type: "mysql"
+    host: "localhost"
+    port: 3306
+    username: "health_user"
+    password: "health_pass"
+    database: "production"
+    tables:
+      - name: "users"
+        query: "SELECT COUNT(*) as count FROM users WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)"
+        timeout: 5
+        check_interval: 30
+      - name: "orders"
+        query: "SELECT COUNT(*) as active_orders FROM orders WHERE status = 'active'"
+        timeout: 10
+        check_interval: 60
+
+  - name: "analytics-postgres"
+    type: "postgres"
+    host: "analytics.example.com"
+    port: 5432
+    username: "readonly_user"
+    password: "secure_password"
+    database: "analytics"
+    ssl_mode: "require"
+    tables:
+      - name: "events"
+        query: "SELECT COUNT(*) as event_count FROM events WHERE created_at > NOW() - INTERVAL '1 hour'"
+        timeout: 15
+        check_interval: 120
+      - name: "sessions"
+        query: "SELECT COUNT(DISTINCT user_id) as active_users FROM sessions WHERE last_activity > NOW() - INTERVAL '5 minutes'"
+        timeout: 5
+        check_interval: 30
+
+  - name: "reporting-mssql"
+    type: "mssql"
+    host: "reports.internal.com"
+    port: 1433
+    username: "report_user"
+    password: "report_password"
+    database: "ReportingDB"
+    tables:
+      - name: "daily_reports"
+        query: "SELECT COUNT(*) as pending_reports FROM daily_reports WHERE status = 'pending' AND created_date = CAST(GETDATE() AS DATE)"
+        timeout: 20
+        check_interval: 300
+      - name: "user_activity"
+        query: "SELECT COUNT(*) as active_sessions FROM user_activity WHERE last_seen > DATEADD(MINUTE, -10, GETDATE())"
+        timeout: 8
+        check_interval: 60
+
+server:
+  host: "localhost"
+  port: 8080
+  read_timeout: 30
+  write_timeout: 30
+  idle_timeout: 120
+
+logging:
+  level: "info"
+  format: "json"
