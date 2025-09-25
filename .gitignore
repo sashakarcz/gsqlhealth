@@ -54,3 +54,4 @@ config.local.yaml
 
 # Air live reload
 tmp/
+.cache

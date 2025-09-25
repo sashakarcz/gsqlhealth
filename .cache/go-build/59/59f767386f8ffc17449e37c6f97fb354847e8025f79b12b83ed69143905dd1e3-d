@@ -1,5 +1,0 @@
-# test log
-getenv TMPDIR
-open /tmp/config_test_3347999517.yaml
-open /tmp/config_test_3347999517.yaml
-open nonexistent.yaml

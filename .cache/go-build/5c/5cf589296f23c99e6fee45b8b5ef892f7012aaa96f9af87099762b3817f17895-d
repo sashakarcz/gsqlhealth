@@ -1,6 +1,0 @@
-covervars.go
-errors.cover.go
-retry.cover.go
-scheduler.cover.go
-service.cover.go
-./service_test.go
