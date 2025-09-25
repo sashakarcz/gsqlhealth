@@ -25,7 +25,7 @@ GSQLHealth is a comprehensive Go-based service for monitoring the health of mult
 ### From Source
 
 ```bash
-git clone <repository>
+git clone https://github.com/sashakarcz/gsqlhealth.git
 cd gsqlhealth
 make build
 ```
