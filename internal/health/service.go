@@ -39,10 +39,13 @@ func NewService(cfg *config.Config, logger *slog.Logger) *Service {
 	return service
 }
 
-// Initialize sets up database connections
+// Initialize sets up database connections with retry logic
 func (s *Service) Initialize(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	connector := NewRetryableConnector(&s.config.Retry, s.logger)
+	connectedCount := 0
 
 	for _, dbConfig := range s.config.Databases {
 		driver, err := s.factory.CreateDriver(dbConfig.Type)
@@ -51,7 +54,8 @@ func (s *Service) Initialize(ctx context.Context) error {
 				"database", dbConfig.Name,
 				"type", dbConfig.Type,
 				"error", err)
-			return fmt.Errorf("failed to create driver for %s: %w", dbConfig.Name, err)
+			// Don't fail completely, continue with other databases
+			continue
 		}
 
 		connInfo := database.ConnectionInfo{
@@ -64,26 +68,43 @@ func (s *Service) Initialize(ctx context.Context) error {
 			Timeout:  30 * time.Second, // Default connection timeout
 		}
 
-		if err := driver.Connect(ctx, connInfo); err != nil {
-			s.logger.Error("Failed to connect to database",
+		// Create a context with timeout for initial connection attempts
+		// We want to try for a reasonable time during startup, then continue with background recovery
+		connCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+
+		// Attempt connection with retry logic
+		if err := connector.ConnectWithRetry(connCtx, driver, connInfo, dbConfig.Name); err != nil {
+			cancel()
+			s.logger.Warn("Failed to connect to database during initialization, will retry in background",
 				"database", dbConfig.Name,
 				"host", dbConfig.Host,
 				"error", err)
-			return fmt.Errorf("failed to connect to database %s: %w", dbConfig.Name, err)
+			driver.Close()
+			// Don't fail the entire service, continue with other databases
+			continue
 		}
+		cancel()
 
 		s.drivers[dbConfig.Name] = driver
+		connectedCount++
 		s.logger.Info("Connected to database",
 			"database", dbConfig.Name,
 			"type", dbConfig.Type,
 			"host", dbConfig.Host)
 	}
 
+	s.logger.Info("Database initialization completed",
+		"connected", connectedCount,
+		"total", len(s.config.Databases))
+
 	// Start the scheduler for periodic health checks
 	if err := s.scheduler.Start(); err != nil {
 		s.logger.Error("Failed to start health check scheduler", "error", err)
 		return fmt.Errorf("failed to start scheduler: %w", err)
 	}
+
+	// Start background connection recovery
+	go s.BackgroundConnectionRecovery(ctx)
 
 	return nil
 }

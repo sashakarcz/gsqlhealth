@@ -33,6 +33,13 @@ server:
 logging:
   level: "info"
   format: "json"
+
+retry:
+  max_attempts: 3
+  initial_delay: 1
+  max_delay: 10
+  backoff_factor: 2
+  connection_retry: 5
 `
 
 	tmpFile, err := os.CreateTemp("", "config_test_*.yaml")
@@ -101,6 +108,13 @@ func TestConfigValidation(t *testing.T) {
 					WriteTimeout: 30,
 					IdleTimeout:  120,
 				},
+				Retry: Retry{
+					MaxAttempts:     3,
+					InitialDelay:    1,
+					MaxDelay:        10,
+					BackoffFactor:   2,
+					ConnectionRetry: 5,
+				},
 			},
 			expectError: false,
 		},
@@ -114,6 +128,13 @@ func TestConfigValidation(t *testing.T) {
 					ReadTimeout:  30,
 					WriteTimeout: 30,
 					IdleTimeout:  120,
+				},
+				Retry: Retry{
+					MaxAttempts:     3,
+					InitialDelay:    1,
+					MaxDelay:        10,
+					BackoffFactor:   2,
+					ConnectionRetry: 5,
 				},
 			},
 			expectError: true,
@@ -141,6 +162,13 @@ func TestConfigValidation(t *testing.T) {
 					ReadTimeout:  30,
 					WriteTimeout: 30,
 					IdleTimeout:  120,
+				},
+				Retry: Retry{
+					MaxAttempts:     3,
+					InitialDelay:    1,
+					MaxDelay:        10,
+					BackoffFactor:   2,
+					ConnectionRetry: 5,
 				},
 			},
 			expectError: true,

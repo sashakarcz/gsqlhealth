@@ -13,6 +13,7 @@ type Config struct {
 	Databases []Database `yaml:"databases"`
 	Server    Server     `yaml:"server"`
 	Logging   Logging    `yaml:"logging"`
+	Retry     Retry      `yaml:"retry"`
 }
 
 // Database represents a database connection configuration
@@ -51,6 +52,15 @@ type Logging struct {
 	Format string `yaml:"format"`
 }
 
+// Retry represents connection retry configuration
+type Retry struct {
+	MaxAttempts     int `yaml:"max_attempts"`      // Maximum number of retry attempts (0 = infinite)
+	InitialDelay    int `yaml:"initial_delay"`     // Initial retry delay in seconds
+	MaxDelay        int `yaml:"max_delay"`         // Maximum retry delay in seconds
+	BackoffFactor   int `yaml:"backoff_factor"`    // Exponential backoff multiplier
+	ConnectionRetry int `yaml:"connection_retry"`  // Retry interval for connection recovery in seconds
+}
+
 // LoadConfig loads configuration from a YAML file
 func LoadConfig(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
@@ -62,6 +72,9 @@ func LoadConfig(filename string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
+
+	// Set defaults for retry configuration
+	config.Retry.SetDefaults()
 
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -84,6 +97,10 @@ func (c *Config) Validate() error {
 
 	if err := c.Server.Validate(); err != nil {
 		return fmt.Errorf("server configuration: %w", err)
+	}
+
+	if err := c.Retry.Validate(); err != nil {
+		return fmt.Errorf("retry configuration: %w", err)
 	}
 
 	return nil
@@ -202,4 +219,59 @@ func (t *Table) GetQueryTimeout() time.Duration {
 // GetCheckInterval returns check interval as time.Duration
 func (t *Table) GetCheckInterval() time.Duration {
 	return time.Duration(t.CheckInterval) * time.Second
+}
+
+// Validate validates retry configuration
+func (r *Retry) Validate() error {
+	if r.MaxAttempts < 0 {
+		return fmt.Errorf("max_attempts cannot be negative")
+	}
+
+	if r.InitialDelay <= 0 {
+		return fmt.Errorf("initial_delay must be positive")
+	}
+
+	if r.MaxDelay <= 0 {
+		return fmt.Errorf("max_delay must be positive")
+	}
+
+	if r.InitialDelay > r.MaxDelay {
+		return fmt.Errorf("initial_delay cannot be greater than max_delay")
+	}
+
+	if r.BackoffFactor <= 0 {
+		return fmt.Errorf("backoff_factor must be positive")
+	}
+
+	if r.ConnectionRetry <= 0 {
+		return fmt.Errorf("connection_retry must be positive")
+	}
+
+	return nil
+}
+
+// GetInitialDelay returns initial delay as time.Duration
+func (r *Retry) GetInitialDelay() time.Duration {
+	return time.Duration(r.InitialDelay) * time.Second
+}
+
+// GetMaxDelay returns max delay as time.Duration
+func (r *Retry) GetMaxDelay() time.Duration {
+	return time.Duration(r.MaxDelay) * time.Second
+}
+
+// GetConnectionRetry returns connection retry interval as time.Duration
+func (r *Retry) GetConnectionRetry() time.Duration {
+	return time.Duration(r.ConnectionRetry) * time.Second
+}
+
+// SetDefaults sets default retry values if not specified
+func (r *Retry) SetDefaults() {
+	if r.MaxAttempts == 0 && r.InitialDelay == 0 {
+		r.MaxAttempts = 0 // infinite retries
+		r.InitialDelay = 5
+		r.MaxDelay = 60
+		r.BackoffFactor = 2
+		r.ConnectionRetry = 30
+	}
 }

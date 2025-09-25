@@ -61,3 +61,10 @@ server:
 logging:
   level: "info"
   format: "json"
+
+retry:
+  max_attempts: 0          # Maximum connection attempts during startup (0 = infinite)
+  initial_delay: 5         # Initial retry delay in seconds
+  max_delay: 60            # Maximum retry delay in seconds
+  backoff_factor: 2        # Exponential backoff multiplier
+  connection_retry: 30     # Background connection recovery interval in seconds

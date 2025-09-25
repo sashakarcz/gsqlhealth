@@ -5,11 +5,14 @@ GSQLHealth is a comprehensive Go-based service for monitoring the health of mult
 ## Features
 
 - **Multi-Database Support**: MySQL, PostgreSQL, and Microsoft SQL Server
+- **Resilient Connections**: Non-blocking startup with automatic connection recovery
 - **Periodic Health Checks**: Configurable intervals for automatic health monitoring
 - **Result Caching**: Fast responses using cached health check results
 - **RESTful API**: Clean HTTP endpoints for health status with real-time and cached modes
 - **Configurable Health Checks**: Custom SQL queries per table/database
 - **Connection Pooling**: Optimized database connections with automatic cleanup
+- **Retry Logic**: Exponential backoff with configurable retry parameters
+- **Background Recovery**: Automatic reconnection to failed databases
 - **Concurrent Processing**: Parallel execution of health checks
 - **Structured Logging**: JSON and text logging with configurable levels
 - **Graceful Shutdown**: Proper cleanup of resources
@@ -99,6 +102,13 @@ server:
 logging:
   level: "info"
   format: "json"
+
+retry:
+  max_attempts: 0          # Maximum connection attempts during startup (0 = infinite)
+  initial_delay: 5         # Initial retry delay in seconds
+  max_delay: 60            # Maximum retry delay in seconds
+  backoff_factor: 2        # Exponential backoff multiplier
+  connection_retry: 30     # Background connection recovery interval in seconds
 ```
 
 ### Configuration Options
@@ -134,6 +144,14 @@ logging:
 
 - `level`: Log level (`debug`, `info`, `warn`, `error`)
 - `format`: Log format (`json`, `text`)
+
+#### Retry Configuration
+
+- `max_attempts`: Maximum connection attempts during startup (0 = infinite retries, recommended)
+- `initial_delay`: Initial retry delay in seconds
+- `max_delay`: Maximum retry delay in seconds
+- `backoff_factor`: Exponential backoff multiplier
+- `connection_retry`: Background connection recovery interval in seconds
 
 ## Usage
 
@@ -174,6 +192,37 @@ make build
 # Run with live reload (requires air)
 make dev
 ```
+
+## Resilient Database Connections
+
+GSQLHealth is designed to be resilient to database connectivity issues:
+
+### Startup Behavior
+- **Non-blocking startup**: Service starts even if some databases are unavailable
+- **Retry logic**: Attempts to connect to databases with exponential backoff
+- **Graceful degradation**: Continues operating with available databases
+
+### Connection Recovery
+- **Background recovery**: Automatically attempts to reconnect to failed databases
+- **Health monitoring**: Continuously monitors connection status
+- **Automatic failover**: Switches to recovered connections seamlessly
+
+### Configuration
+The retry behavior is fully configurable:
+```yaml
+retry:
+  max_attempts: 0          # Startup connection attempts (0 = infinite)
+  initial_delay: 5         # Start with 5-second delays
+  max_delay: 60            # Cap delays at 1 minute
+  backoff_factor: 2        # Double the delay each attempt
+  connection_retry: 30     # Check for recovery every 30 seconds
+```
+
+**Infinite Retries**: By default, the service will retry connections indefinitely (`max_attempts: 0`). This ensures:
+- Service stays running during database outages
+- Continuous monitoring and outage data collection
+- Automatic recovery when databases come back online
+- Historical data about connection failures and recovery times
 
 ## Periodic Health Checks
 
