@@ -39,74 +39,76 @@ func NewService(cfg *config.Config, logger *slog.Logger) *Service {
 	return service
 }
 
-// Initialize sets up database connections with retry logic
+// Initialize sets up the service and starts background database connections
 func (s *Service) Initialize(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.logger.Info("Initializing health service")
 
-	connector := NewRetryableConnector(&s.config.Retry, s.logger)
-	connectedCount := 0
-
-	for _, dbConfig := range s.config.Databases {
-		driver, err := s.factory.CreateDriver(dbConfig.Type)
-		if err != nil {
-			s.logger.Error("Failed to create driver",
-				"database", dbConfig.Name,
-				"type", dbConfig.Type,
-				"error", err)
-			// Don't fail completely, continue with other databases
-			continue
-		}
-
-		connInfo := database.ConnectionInfo{
-			Host:     dbConfig.Host,
-			Port:     dbConfig.Port,
-			Username: dbConfig.Username,
-			Password: dbConfig.Password,
-			Database: dbConfig.Database,
-			SSLMode:  dbConfig.SSLMode,
-			Timeout:  30 * time.Second, // Default connection timeout
-		}
-
-		// Create a context with timeout for initial connection attempts
-		// We want to try for a reasonable time during startup, then continue with background recovery
-		connCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-
-		// Attempt connection with retry logic
-		if err := connector.ConnectWithRetry(connCtx, driver, connInfo, dbConfig.Name); err != nil {
-			cancel()
-			s.logger.Warn("Failed to connect to database during initialization, will retry in background",
-				"database", dbConfig.Name,
-				"host", dbConfig.Host,
-				"error", err)
-			driver.Close()
-			// Don't fail the entire service, continue with other databases
-			continue
-		}
-		cancel()
-
-		s.drivers[dbConfig.Name] = driver
-		connectedCount++
-		s.logger.Info("Connected to database",
-			"database", dbConfig.Name,
-			"type", dbConfig.Type,
-			"host", dbConfig.Host)
-	}
-
-	s.logger.Info("Database initialization completed",
-		"connected", connectedCount,
-		"total", len(s.config.Databases))
-
-	// Start the scheduler for periodic health checks
+	// Start the scheduler for periodic health checks (even without database connections)
 	if err := s.scheduler.Start(); err != nil {
 		s.logger.Error("Failed to start health check scheduler", "error", err)
 		return fmt.Errorf("failed to start scheduler: %w", err)
 	}
 
+	// Start background database connections asynchronously
+	go s.initializeDatabaseConnections(ctx)
+
 	// Start background connection recovery
 	go s.BackgroundConnectionRecovery(ctx)
 
+	s.logger.Info("Health service initialized, database connections starting in background")
 	return nil
+}
+
+// initializeDatabaseConnections attempts to connect to all databases in the background
+func (s *Service) initializeDatabaseConnections(ctx context.Context) {
+	s.logger.Info("Starting database connection initialization in background")
+
+	connector := NewRetryableConnector(&s.config.Retry, s.logger)
+	connectedCount := 0
+
+	for _, dbConfig := range s.config.Databases {
+		// Start each database connection attempt in its own goroutine
+		go func(dbConfig config.Database) {
+			driver, err := s.factory.CreateDriver(dbConfig.Type)
+			if err != nil {
+				s.logger.Error("Failed to create driver",
+					"database", dbConfig.Name,
+					"type", dbConfig.Type,
+					"error", err)
+				return
+			}
+
+			connInfo := database.ConnectionInfo{
+				Host:     dbConfig.Host,
+				Port:     dbConfig.Port,
+				Username: dbConfig.Username,
+				Password: dbConfig.Password,
+				Database: dbConfig.Database,
+				SSLMode:  dbConfig.SSLMode,
+				Timeout:  30 * time.Second,
+			}
+
+			// Attempt connection with infinite retry logic
+			if err := connector.ConnectWithRetry(ctx, driver, connInfo, dbConfig.Name); err != nil {
+				s.logger.Warn("Database connection initialization cancelled",
+					"database", dbConfig.Name,
+					"error", err)
+				driver.Close()
+				return
+			}
+
+			// Successfully connected, add to drivers map
+			s.mu.Lock()
+			s.drivers[dbConfig.Name] = driver
+			connectedCount++
+			s.mu.Unlock()
+
+			s.logger.Info("Successfully connected to database",
+				"database", dbConfig.Name,
+				"type", dbConfig.Type,
+				"host", dbConfig.Host)
+		}(dbConfig)
+	}
 }
 
 // CheckHealth performs a health check for a specific database and table
@@ -142,7 +144,7 @@ func (s *Service) CheckHealth(ctx context.Context, databaseName, tableName strin
 	// Get the driver
 	driver, exists := s.drivers[databaseName]
 	if !exists {
-		return nil, NewConnectionError(databaseName, tableName, "database driver not initialized", nil)
+		return nil, NewConnectionError(databaseName, tableName, "database connection failed", nil)
 	}
 
 	// Create result structure

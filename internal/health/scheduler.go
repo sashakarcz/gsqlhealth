@@ -161,7 +161,7 @@ func (s *Scheduler) performHealthCheck(databaseName, tableName, key string) {
 		cachedResult.mu.Unlock()
 
 		if err != nil {
-			s.logger.Warn("Scheduled health check failed",
+			s.logger.Debug("Scheduled health check failed (expected during startup/outages)",
 				"database", databaseName,
 				"table", tableName,
 				"error", err)
